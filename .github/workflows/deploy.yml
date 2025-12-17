@@ -1,0 +1,36 @@
+name: Deploy Django App to Kubernetes
+on:
+  push:
+    branches: [ main ]
+env:
+  REGISTRY: ghcr.io
+  # ВПИШИ СЮДА СВОЙ РЕПОЗИТОРИЙ (маленькими!)
+  # Пример: IMAGE_NAME: zofus/django-kubernetes-app
+  IMAGE_NAME: ryosuk3/django-kubernetes-app
+  K8S_NAMESPACE: django-app
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f k8s-manifests/ -n ${{ env.K8S_NAMESPACE }}
+          kubectl apply -f k8s-manifests/postgres/ -n ${{ env.K8S_NAMESPACE }}
+          kubectl rollout restart deployment/django-deployment -n ${{ env.K8S_NAMESPACE }}
